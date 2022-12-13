@@ -110,7 +110,6 @@ class TocMachine(GraphMachine):
                 items=self.items
             
             ),
-            emojis=emoji
         )
         line_bot_api.reply_message(reply_token, self.message)
         self.go_back()
