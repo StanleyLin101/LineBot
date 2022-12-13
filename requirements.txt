@@ -9,7 +9,7 @@ itsdangerous==1.1.0
 jinja2==2.10.3
 line-bot-sdk==1.14.0
 markupsafe==1.1.1
-pygraphviz==1.5
+pygraphviz
 python-dotenv==0.10.3
 requests==2.22.0
 six==1.12.0

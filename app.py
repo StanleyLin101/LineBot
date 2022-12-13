@@ -14,8 +14,14 @@ load_dotenv()
 
 
 machine = TocMachine(
-    states=["user", "state1", "state2"],
+    states=["user", "greeting", "state1", "state2", "state3"],
     transitions=[
+        {
+            "trigger": "advance",
+            "source": "user",
+            "dest": "greeting",
+            "conditions": "is_going_to_greeting",
+        },
         {
             "trigger": "advance",
             "source": "user",
@@ -28,7 +34,16 @@ machine = TocMachine(
             "dest": "state2",
             "conditions": "is_going_to_state2",
         },
-        {"trigger": "go_back", "source": ["state1", "state2"], "dest": "user"},
+        {
+            "trigger": "advance",
+            "source": "user",
+            "dest": "state3",
+            "conditions": "is_going_to_state3",
+        },
+        {   "trigger": "go_back", 
+            "source": ["greeting", "state1", "state2", "state3"], 
+            "dest": "user"
+        },
     ],
     initial="user",
     auto_transitions=False,
@@ -91,7 +106,10 @@ def webhook_handler():
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         abort(400)
-
+    try:
+        line_bot_api.push_message('1657725145', TextSendMessage(text='Hello World!!!'))
+    except:
+        pass
     # if event is MessageEvent and message is TextMessage, then echo text
     for event in events:
         if not isinstance(event, MessageEvent):
