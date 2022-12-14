@@ -7,6 +7,12 @@ from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
+# Google Map API
+import requests
+import urllib.request
+import json
+import time
+
 from fsm import TocMachine
 from utils import send_text_message
 
@@ -56,6 +62,8 @@ app = Flask(__name__, static_url_path="")
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv("LINE_CHANNEL_SECRET", None)
 channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", None)
+Google_Map_API_KEY = os.getenv("GOOGLE_MAP_API_KEY", None)
+
 if channel_secret is None:
     print("Specify LINE_CHANNEL_SECRET as environment variable.")
     sys.exit(1)
@@ -106,12 +114,21 @@ def webhook_handler():
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         abort(400)
-    try:
-        line_bot_api.push_message('1657725145', TextSendMessage(text='Hello World!!!'))
-    except:
-        pass
+
+    # print("***********"+str(events)+"************\n")
+
+    # if(events.message.type == "location"):
+    #     print("location")
+    #     print("latitude: "+ events.latitude)
+    #     print("longitude: "+ events.longitude)
+
     # if event is MessageEvent and message is TextMessage, then echo text
     for event in events:
+        # print("typeee: "+ str(event.message.type))
+        if(event.message.type == "location"):
+            print("location")
+            print("latitude: "+ str(event.message.latitude))
+            print("longitude: "+ str(event.message.longitude))
         if not isinstance(event, MessageEvent):
             continue
         if not isinstance(event.message, TextMessage):

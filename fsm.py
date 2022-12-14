@@ -13,12 +13,18 @@ from linebot.exceptions import (
     InvalidSignatureError	
 )	
 from linebot.models import *
-
+# Google Map API
+import requests
+import urllib.request
+import json
+import time
+import random
 load_dotenv()
 
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv("LINE_CHANNEL_SECRET", None)
 channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", None)
+Google_Map_API_KEY = os.getenv("GOOGLE_MAP_API_KEY", None)
 if channel_secret is None:
     print("Specify LINE_CHANNEL_SECRET as environment variable.")
     sys.exit(1)
@@ -34,19 +40,6 @@ class TocMachine(GraphMachine):
         self.machine = GraphMachine(model=self, **machine_configs)
         # print("Test!")
         self.items=[]
-        # self.columns=[]
-        # self.jishobutton = QuickReplyButton(
-        #             action=PostbackAction(label="英日字典", data = "英日字典", text = "英日字典")
-        # )
-        # items.append(self.jishobutton)
-        # self.engbutton = QuickReplyButton(
-        #     action=PostbackAction(label="英英字典",data="英英字典", text = "英英字典")
-        # )
-        # items.append(self.engbutton)
-        # self.srcbutton = QuickReplyButton(
-        #     action=PostbackAction(label="查看機器人介紹",data="機器人的資料來源", text = "查看機器人資料")
-        # )
-        # items.append(self.srcbutton)
         greeting_text = """
             嗨囉~\n
             我可以幫你決定早餐或晚餐要吃什麼喔！\n
@@ -134,9 +127,79 @@ class TocMachine(GraphMachine):
 
     def on_enter_state2(self, event):
         print("I'm entering state2")
+        # get_location('台南市東區中華東路三段380巷1號1')
 
-        reply_token = event.reply_token
-        send_text_message(reply_token, "Trigger state2")
+        ### get lat and lng
+        address = urllib.request.quote('成功大學')
+        url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + address + '&key='+ Google_Map_API_KEY
+
+        while True:
+            res = requests.get(url)
+            js = json.loads(res.text)
+
+            if js['status'] != "OVER_QUERY_LIMIT":
+                time.sleep(1)
+                break
+
+        result = js['results'][0]["geometry"]["location"]
+        lat = result["lat"]
+        lng = result["lng"]
+        print(lat, lng)
+        ###
+        ### nearby restaurants
+        foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&type=restaurant&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        foodReq = requests.get(foodStoreSearch)
+        nearby_restaurants_dict = foodReq.json()
+        top20_restaurants = nearby_restaurants_dict['results']
+        res_num = len(top20_restaurants)
+        bravo = []
+        for i in range(res_num):
+            try:
+                if top20_restaurants[i]['rating'] > 3.9:
+                    print('rate: ', top20_restaurants[i]['rating'])
+                    bravo.append(i)
+            except:
+                KeyError
+        if len(bravo) < 0:
+            content = "沒東西可以吃"
+            # restaurant = random.choice(top20_restaurants)
+        
+        restaurant = top20_restaurants[random.choice(bravo)]
+
+        if restaurant.get("photos") is None:
+            thumbnail_image_url = None
+        else:
+            photo_reference = restaurant["photos"][0]["photo_reference"]
+            photo_width = restaurant["photos"][0]["width"]
+            thumbnail_image_url = "https://maps.googleapis.com/maps/api/place/photo?key={}&photoreference={}&maxwidth={}".format(Google_Map_API_KEY, photo_reference, photo_width)
+        
+        rating = "無" if restaurant.get("rating") is None else restaurant["rating"]
+        address = "沒有資料" if restaurant.get("vicinity") is None else restaurant["vicinity"]
+        details = "Google Map評分: {}\n 地址:{}".format(rating, address)
+        print(details)
+
+        map_url = "https://www.google.com/maps/search/?api=1&query={lat},{long}&query_place_id={place_id}".format(lat=restaurant["geometry"]["location"]["lat"], long=restaurant["geometry"]["location"]["lng"], place_id= restaurant["place_id"])
+        ###
+        print("Find Restaurant")
+        print("title: ", restaurant['name'])
+        ### reply
+        # reply_token = event.reply_token
+        # send_text_message(reply_token, "Trigger state2")
+        # buttons_template = TemplateSendMessage(
+        #     alt_text=restaurant["name"],
+        #     template=ButtonsTemplate(
+        #         thumbnail_image_url = thumbnail_image_url,
+        #         title = restaurant['name'],
+        #         text = details,
+        #         actions=[
+        #             URITemplateAction(
+        #                 label='查看地圖',
+        #                 url=map_url
+        #             ),
+        #         ]
+        #     )
+        # )
+        # line_bot_api.reply_message(event.reply_token, buttons_template)
         self.go_back()
 
     def on_exit_state2(self):
@@ -151,3 +214,23 @@ class TocMachine(GraphMachine):
 
     def on_exit_state3(self):
         print("Leaving state3")
+
+
+    def get_location(address):
+        address = urllib.request.quote(address)
+        url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + address + '&key='+ Google_Map_API_KEY
+
+        while True:
+            res = requests.get(url)
+            js = json.loads(res.text)
+
+            if js['status'] != "OVER_QUERY_LIMIT":
+                time.sleep(1)
+                break
+
+        result = js['result'][0]["geometry"]["location"]
+        lat = result["lat"]
+        lng = result["lng"]
+        print(lat, lng)
+        return lat, lng
+
