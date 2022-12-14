@@ -7,7 +7,13 @@ from flask import Flask, jsonify, request, abort, send_file
 from dotenv import load_dotenv
 from linebot import LineBotApi, WebhookParser, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import (
+    MessageEvent,
+    TextSendMessage,
+    TemplateSendMessage,
+    ButtonsTemplate,
+    MessageTemplateAction,
+)
 #LineBot所需要的套件	
 from linebot.exceptions import (	
     InvalidSignatureError	
@@ -61,7 +67,13 @@ class TocMachine(GraphMachine):
 
     def is_going_to_greeting(self, event):
         text = event.message.text
-        return text == "Hi"
+        return text.lower() == "hi"
+    # def is_going_to_eat(self, event):
+    #     text = event.message.text
+    #     return text == "吃東西"
+    # def is_going_to_drink(self, event):
+    #     text = event.message.text
+    #     return text == "喝飲料"
 
     def is_going_to_state1(self, event):
         text = event.message.text
@@ -75,27 +87,29 @@ class TocMachine(GraphMachine):
         text = event.message.text
         return text.lower() == "go to state3"
 
+    ############################################
+    
     def on_enter_greeting(self, event):
         print("I'm entering greeting")
         reply_token = event.reply_token
         # send_text_message(reply_token, "Trigger greeting")
         self.breakfastbutton = QuickReplyButton(
-            action=PostbackAction(label="找早餐",data="找早餐", text = "找早餐")
+            action=PostbackAction(label="吃東西",data="吃東西", text = "吃東西")
         )
         self.items.append(self.breakfastbutton)
         self.lunchbutton = QuickReplyButton(
-            action=PostbackAction(label="找晚餐",data="找晚餐", text = "找晚餐")
+            action=PostbackAction(label="喝飲料",data="喝飲料", text = "喝飲料")
         )
         self.items.append(self.lunchbutton)
         self.randombutton = QuickReplyButton(
-            action=PostbackAction(label="隨便吃",data="隨便吃", text = "隨便吃")
+            action=PostbackAction(label="隨便",data="隨便", text = "隨便")
         )
         self.items.append(self.randombutton)
         self.message = TextSendMessage(
             text="""
 嗨囉~\n
 我是機器人哲哥\n
-我可以幫你決定早餐或晚餐要吃什麼喔！\n
+我可以幫你決定要吃什麼喔！\n
 你可以透過下面選單點選或是直接按快速回復按鈕來開始\n
 讓你不再為了要吃什麼而煩惱~\n
             """,
@@ -105,10 +119,23 @@ class TocMachine(GraphMachine):
             ),
         )
         line_bot_api.reply_message(reply_token, self.message)
-        self.go_back()
+        # self.go_back()
+    # def on_exit_greeting(self):
+    #     print("Leaving greeting")
 
-    def on_exit_greeting(self):
-        print("Leaving greeting")
+    def on_enter_eat(self, event):
+        print("I'm entering eating")
+        reply_token = event.reply_token
+        send_text_message(reply_token, "請輸入你的位置")
+
+    def on_exit_state1(self):
+        print("Leaving eating")
+
+    def on_enter_drink(self, event):
+        print("I'm entering drinking")
+
+    def on_exit_drink(self):
+        print("Leaving drinking")
 
     def on_enter_state1(self, event):
         print("I'm entering state1")
@@ -125,12 +152,14 @@ class TocMachine(GraphMachine):
     def on_exit_state1(self):
         print("Leaving state1")
 
-    def on_enter_state2(self, event):
-        print("I'm entering state2")
+    def on_enter_FindRestaurant(self, event):
+        print("I'm entering FindRestaurant")
+        text = event.message.text
+        # print(text)
         # get_location('台南市東區中華東路三段380巷1號1')
 
         ### get lat and lng
-        address = urllib.request.quote('成功大學')
+        address = urllib.request.quote(text)
         url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + address + '&key='+ Google_Map_API_KEY
 
         while True:
@@ -175,7 +204,7 @@ class TocMachine(GraphMachine):
         
         rating = "無" if restaurant.get("rating") is None else restaurant["rating"]
         address = "沒有資料" if restaurant.get("vicinity") is None else restaurant["vicinity"]
-        details = "Google Map評分: {}\n 地址:{}".format(rating, address)
+        details = "Google Map 評分: {}\n地址:{}".format(rating, address)
         print(details)
 
         map_url = "https://www.google.com/maps/search/?api=1&query={lat},{long}&query_place_id={place_id}".format(lat=restaurant["geometry"]["location"]["lat"], long=restaurant["geometry"]["location"]["lng"], place_id= restaurant["place_id"])
@@ -183,7 +212,7 @@ class TocMachine(GraphMachine):
         print("Find Restaurant")
         print("title: ", restaurant['name'])
         ### reply
-        # reply_token = event.reply_token
+        reply_token = event.reply_token
         # send_text_message(reply_token, "Trigger state2")
         # buttons_template = TemplateSendMessage(
         #     alt_text=restaurant["name"],
@@ -195,11 +224,31 @@ class TocMachine(GraphMachine):
         #             URITemplateAction(
         #                 label='查看地圖',
         #                 url=map_url
-        #             ),
+        #             )
         #         ]
         #     )
         # )
-        # line_bot_api.reply_message(event.reply_token, buttons_template)
+        # line_bot_api.reply_message(reply_token, buttons_template)
+
+        buttons_template_message = TemplateSendMessage(
+            alt_text = restaurant["name"],
+            template = ButtonsTemplate(
+                thumbnail_image_url = thumbnail_image_url,
+                title = restaurant['name'],
+                text= details,
+                actions=[
+                    # URITemplateAction(
+                    #     label='查看地圖',
+                    #     url=map_url
+                    # )
+                    MessageTemplateAction(
+                        label='查看地圖',
+                        text='show_map',
+                    )
+                ]
+            )
+        )
+        line_bot_api.reply_message(event.reply_token, buttons_template_message)
         self.go_back()
 
     def on_exit_state2(self):

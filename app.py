@@ -20,7 +20,7 @@ load_dotenv()
 
 
 machine = TocMachine(
-    states=["user", "greeting", "state1", "state2", "state3"],
+    states=["user", "greeting","eat","FindRestaurant", "state1", "state2", "state3"],
     transitions=[
         {
             "trigger": "advance",
@@ -30,9 +30,15 @@ machine = TocMachine(
         },
         {
             "trigger": "advance",
-            "source": "user",
-            "dest": "state1",
-            "conditions": "is_going_to_state1",
+            "source": "greeting",
+            "dest": "eat",
+            # "conditions": "is_going_to_eat",
+        },
+        {
+            "trigger": "advance",
+            "source": "eat",
+            "dest": "FindRestaurant",
+            # "conditions": "is_going_to_FindRestaurant",
         },
         {
             "trigger": "advance",
@@ -47,7 +53,7 @@ machine = TocMachine(
             "conditions": "is_going_to_state3",
         },
         {   "trigger": "go_back", 
-            "source": ["greeting", "state1", "state2", "state3"], 
+            "source": ["FindRestaurant", "state1", "state2", "state3"], 
             "dest": "user"
         },
     ],
@@ -125,7 +131,10 @@ def webhook_handler():
     # if event is MessageEvent and message is TextMessage, then echo text
     for event in events:
         # print("typeee: "+ str(event.message.type))
-        if(event.message.type == "location"):
+        if event.type == 'postback':
+            # print("EEEE:", event.message.text)
+            print("EEEE:")
+        elif(event.message.type == "location"):
             print("location")
             print("latitude: "+ str(event.message.latitude))
             print("longitude: "+ str(event.message.longitude))
