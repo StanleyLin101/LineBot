@@ -26,7 +26,7 @@ import json
 import time
 import random
 load_dotenv()
-
+first = True
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv("LINE_CHANNEL_SECRET", None)
 channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", None)
@@ -44,54 +44,39 @@ parser = WebhookParser(channel_secret)
 class TocMachine(GraphMachine):
     def __init__(self, **machine_configs):
         self.machine = GraphMachine(model=self, **machine_configs)
-        # print("Test!")
+        # print("User!")
         self.items=[]
-        greeting_text = """
-            嗨囉~\n
-            我可以幫你決定早餐或晚餐要吃什麼喔！\n
-            可以透過快速回覆按鈕省下打字的時間喔！\n
-            輸入\n【英英字典】\n【英日字典】\n進入字典模式！
-        """
-        self.message = TextSendMessage(
-            text="""嗨你好~\n
-            我是機器人Leo\n
-            我可以讓您方便快速的查詢英日語名詞解釋以及發音！\n
-            可以透過快速回覆按鈕省下打字的時間喔！\n
-            輸入\n【英英字典】\n【英日字典】\n進入字典模式！""",
-            # quick_reply=QuickReply(
-            #     items=items
-            #
-            #  )
-        )
-        # line_bot_api.reply_message(reply_token,self.message)
 
+############ is_going ############
     def is_going_to_greeting(self, event):
         text = event.message.text
         return text.lower() == "hi"
-    # def is_going_to_eat(self, event):
-    #     text = event.message.text
-    #     return text == "吃東西"
-    # def is_going_to_drink(self, event):
-    #     text = event.message.text
-    #     return text == "喝飲料"
 
     def is_going_to_state1(self, event):
         text = event.message.text
         return text.lower() == "go to state1"
-
-    def is_going_to_state2(self, event):
-        text = event.message.text
-        return text.lower() == "go to state2"
     
-    def is_going_to_state3(self, event):
+    def is_going_to_FindnewRestaurant(self, event):
         text = event.message.text
-        return text.lower() == "go to state3"
-
-    ############################################
-    
+        print("FindnewRestaurant text: ",text)
+        if(text == '換一間啦'):
+            return True
+        else:
+            return False
+    def is_going_to_greeting_again(self, event):
+        text = event.message.text
+        print("FindnewRestaurant text: ",text)
+        if(text == '換一間啦'):
+            return False
+        else:
+            return True
+############ on_enter ############
     def on_enter_greeting(self, event):
         print("I'm entering greeting")
+        global first
+        first = True
         reply_token = event.reply_token
+        self.items.clear()
         # send_text_message(reply_token, "Trigger greeting")
         self.breakfastbutton = QuickReplyButton(
             action=PostbackAction(label="吃東西",data="吃東西", text = "吃東西")
@@ -123,19 +108,12 @@ class TocMachine(GraphMachine):
     # def on_exit_greeting(self):
     #     print("Leaving greeting")
 
-    def on_enter_eat(self, event):
-        print("I'm entering eating")
+    def on_enter_getLocation(self, event):
+        # print("I'm entering eating")
+        self.ans = event.message.text
+        print("ans: ", self.ans)
         reply_token = event.reply_token
         send_text_message(reply_token, "請輸入你的位置")
-
-    def on_exit_state1(self):
-        print("Leaving eating")
-
-    def on_enter_drink(self, event):
-        print("I'm entering drinking")
-
-    def on_exit_drink(self):
-        print("Leaving drinking")
 
     def on_enter_state1(self, event):
         print("I'm entering state1")
@@ -149,17 +127,19 @@ class TocMachine(GraphMachine):
         line_bot_api.reply_message(reply_token, sticker_message)
         self.go_back()
 
-    def on_exit_state1(self):
-        print("Leaving state1")
-
     def on_enter_FindRestaurant(self, event):
         print("I'm entering FindRestaurant")
+        # print("Res ans = ", self.ans)
         text = event.message.text
+        global first
+        if first:
+            self.previous_address = text
+            first = False
         # print(text)
         # get_location('台南市東區中華東路三段380巷1號1')
 
         ### get lat and lng
-        address = urllib.request.quote(text)
+        address = urllib.request.quote(self.previous_address)
         url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + address + '&key='+ Google_Map_API_KEY
 
         while True:
@@ -176,7 +156,12 @@ class TocMachine(GraphMachine):
         print(lat, lng)
         ###
         ### nearby restaurants
-        foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&type=restaurant&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        if self.ans == "吃東西":
+            foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&type=restaurant&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        elif self.ans == "喝飲料":
+            foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&keyword=飲料&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        else:
+             foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
         foodReq = requests.get(foodStoreSearch)
         nearby_restaurants_dict = foodReq.json()
         top20_restaurants = nearby_restaurants_dict['results']
@@ -213,22 +198,6 @@ class TocMachine(GraphMachine):
         print("title: ", restaurant['name'])
         ### reply
         reply_token = event.reply_token
-        # send_text_message(reply_token, "Trigger state2")
-        # buttons_template = TemplateSendMessage(
-        #     alt_text=restaurant["name"],
-        #     template=ButtonsTemplate(
-        #         thumbnail_image_url = thumbnail_image_url,
-        #         title = restaurant['name'],
-        #         text = details,
-        #         actions=[
-        #             URITemplateAction(
-        #                 label='查看地圖',
-        #                 url=map_url
-        #             )
-        #         ]
-        #     )
-        # )
-        # line_bot_api.reply_message(reply_token, buttons_template)
 
         buttons_template_message = TemplateSendMessage(
             alt_text = restaurant["name"],
@@ -237,49 +206,21 @@ class TocMachine(GraphMachine):
                 title = restaurant['name'],
                 text= details,
                 actions=[
-                    # URITemplateAction(
-                    #     label='查看地圖',
-                    #     url=map_url
-                    # )
-                    MessageTemplateAction(
+                    URITemplateAction(
                         label='查看地圖',
-                        text='show_map',
+                        uri=map_url
+                    ),
+                    PostbackTemplateAction(
+                        label='換一間啦',
+                        text='換一間啦',
+                        data='換一間啦'
                     )
                 ]
             )
         )
-        line_bot_api.reply_message(event.reply_token, buttons_template_message)
-        self.go_back()
+        line_bot_api.reply_message(reply_token, buttons_template_message)
+        # self.go_back_greeting()
 
-    def on_exit_state2(self):
-        print("Leaving state2")
-
-    def on_enter_state3(self, event):
-        print("I'm entering state3")
-
-        reply_token = event.reply_token
-        send_text_message(reply_token, "Trigger state3")
-        self.go_back()
-
-    def on_exit_state3(self):
-        print("Leaving state3")
-
-
-    def get_location(address):
-        address = urllib.request.quote(address)
-        url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + address + '&key='+ Google_Map_API_KEY
-
-        while True:
-            res = requests.get(url)
-            js = json.loads(res.text)
-
-            if js['status'] != "OVER_QUERY_LIMIT":
-                time.sleep(1)
-                break
-
-        result = js['result'][0]["geometry"]["location"]
-        lat = result["lat"]
-        lng = result["lng"]
-        print(lat, lng)
-        return lat, lng
-
+############ on_exit ############
+    def on_exit_state1(self):
+        print("Leaving state1")
