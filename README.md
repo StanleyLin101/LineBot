@@ -10,21 +10,21 @@
 
 ## 功能展示
 ### Greeting
-![1](img/1.jpg)
----
+<img src="img/1.jpg" width="375" height="812" />
+
 ### 吃東西/喝飲料/踩雷
-![2](img/2.jpg)
----
+<img src="img/2.jpg" width="375" height="812" />
+
 ### 輸入位置
-![3](img/3.jpg)
----
+<img src="img/3.jpg" width="375" height="812" />
+
 ### 查看地圖
-![4](img/4.jpg)
----
+<img src="img/4.jpg" width="375" height="812" />
+
 ### 換一間啦
-![5](img/5.jpg)
----
+<img src="img/5.jpg" width="375" height="812" />
+
 ### 換地點
-![7](img/7.jpg)
----
+<img src="img/7.jpg" width="375" height="812" />
+
 
