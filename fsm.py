@@ -57,9 +57,9 @@ class TocMachine(GraphMachine):
         text = event.message.text
         return text.lower() == "fsm"
 
-    def is_going_to_state1(self, event):
-        text = event.message.text
-        return text.lower() == "go to state1"
+    # def is_going_to_state1(self, event):
+    #     text = event.message.text
+    #     return text.lower() == "go to state1"
     
     def is_going_to_eat(self, event):
         text = event.message.text
@@ -68,12 +68,18 @@ class TocMachine(GraphMachine):
     def is_going_to_drink(self, event):
         text = event.message.text
         return text.lower() == "喝飲料"
+    def is_going_to_drink(self, event):
+        text = event.message.text
+        return text.lower() == "踩雷"
 
     def is_going_to_FindRestaurant(self, event):
         return self.ans == "吃東西"
 
     def is_going_to_FindDrink(self, event):
         return self.ans == "喝飲料"
+
+    def is_going_to_FindBomb(self, event):
+        return self.ans == "踩雷"
 
     def is_going_to_FindnewRestaurant(self, event):
         text = event.message.text
@@ -120,7 +126,7 @@ class TocMachine(GraphMachine):
         )
         self.items.append(self.lunchbutton)
         self.randombutton = QuickReplyButton(
-            action=PostbackAction(label="隨便",data="隨便", text = "隨便")
+            action=PostbackAction(label="踩雷",data="踩雷", text = "踩雷")
         )
         self.items.append(self.randombutton)
         self.message = TextSendMessage(
@@ -166,17 +172,17 @@ class TocMachine(GraphMachine):
         reply_token = event.reply_token
         send_text_message(reply_token, "請輸入你的位置")
 
-    def on_enter_state1(self, event):
-        print("I'm entering state1")
+    # def on_enter_state1(self, event):
+    #     print("I'm entering state1")
 
-        reply_token = event.reply_token
-        # send_text_message(reply_token, "Trigger state1")
-        sticker_message = StickerSendMessage(	
-            package_id='446',	
-            sticker_id='1988'	
-        )	
-        line_bot_api.reply_message(reply_token, sticker_message)
-        self.go_back()
+    #     reply_token = event.reply_token
+    #     # send_text_message(reply_token, "Trigger state1")
+    #     sticker_message = StickerSendMessage(	
+    #         package_id='446',	
+    #         sticker_id='1988'	
+    #     )	
+    #     line_bot_api.reply_message(reply_token, sticker_message)
+    #     self.go_back()
 
     def on_enter_FindRestaurant(self, event):
         self.mode = "eat"
@@ -221,13 +227,14 @@ class TocMachine(GraphMachine):
         bravo = []
         for i in range(res_num):
             try:
-                if top20_restaurants[i]['rating'] > 3.5:
+                if top20_restaurants[i]['rating'] > 4:
                     print('rate: ', top20_restaurants[i]['rating'])
                     bravo.append(i)
             except:
                 KeyError
         if len(bravo) < 0:
-            content = "沒東西可以吃"
+            reply_token = event.reply_token
+            send_text_message(reply_token, "你附近沒有雷!")
             # restaurant = random.choice(top20_restaurants)
         
         restaurant = top20_restaurants[random.choice(bravo)]
@@ -282,8 +289,6 @@ class TocMachine(GraphMachine):
         if first:
             self.previous_address = text
             first = False
-        # print(text)
-        # get_location('台南市東區中華東路三段380巷1號1')
 
         ### get lat and lng
         address = urllib.request.quote(self.previous_address)
@@ -316,7 +321,7 @@ class TocMachine(GraphMachine):
         bravo = []
         for i in range(res_num):
             try:
-                if top20_restaurants[i]['rating'] > 3.5:
+                if top20_restaurants[i]['rating'] > 4:
                     print('rate: ', top20_restaurants[i]['rating'])
                     bravo.append(i)
             except:
@@ -366,6 +371,94 @@ class TocMachine(GraphMachine):
             )
         )
         line_bot_api.reply_message(reply_token, buttons_template_message)
+
+    def on_enter_FindBomb(self, event):
+        self.mode = "bomb"
+        print("I'm entering FindBomb")
+        # print("Res ans = ", self.ans)
+        text = event.message.text
+        global first
+        if first:
+            self.previous_address = text
+            first = False
+
+        ### get lat and lng
+        address = urllib.request.quote(self.previous_address)
+        url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + address + '&key='+ Google_Map_API_KEY
+
+        while True:
+            res = requests.get(url)
+            js = json.loads(res.text)
+
+            if js['status'] != "OVER_QUERY_LIMIT":
+                time.sleep(1)
+                break
+
+        result = js['results'][0]["geometry"]["location"]
+        lat = result["lat"]
+        lng = result["lng"]
+        print(lat, lng)
+        ###
+        ### nearby restaurants
+        if self.ans == "吃東西":
+            foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&type=restaurant&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        elif self.ans == "喝飲料":
+            foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&keyword=飲料&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        else:
+             foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        foodReq = requests.get(foodStoreSearch)
+        nearby_restaurants_dict = foodReq.json()
+        top20_restaurants = nearby_restaurants_dict['results']
+        res_num = len(top20_restaurants)
+        bravo = []
+        for i in range(res_num):
+            try:
+                if top20_restaurants[i]['rating'] <= 4:
+                    print('rate: ', top20_restaurants[i]['rating'])
+                    bravo.append(i)
+            except:
+                KeyError
+        if len(bravo) < 0:
+            send_text_message(reply_token, "你附近沒有雷!")
+            self.go_back()
+        
+        restaurant = top20_restaurants[random.choice(bravo)]
+
+        if restaurant.get("photos") is None:
+            thumbnail_image_url = None
+        else:
+            photo_reference = restaurant["photos"][0]["photo_reference"]
+            photo_width = restaurant["photos"][0]["width"]
+            thumbnail_image_url = "https://maps.googleapis.com/maps/api/place/photo?key={}&photoreference={}&maxwidth={}".format(Google_Map_API_KEY, photo_reference, photo_width)
+        
+        rating = "無" if restaurant.get("rating") is None else restaurant["rating"]
+        address = "沒有資料" if restaurant.get("vicinity") is None else restaurant["vicinity"]
+        details = "Google Map 評分: {}\n地址:{}".format(rating, address)
+        print(details)
+
+        map_url = "https://www.google.com/maps/search/?api=1&query={lat},{long}&query_place_id={place_id}".format(lat=restaurant["geometry"]["location"]["lat"], long=restaurant["geometry"]["location"]["lng"], place_id= restaurant["place_id"])
+        ###
+        print("Find Restaurant")
+        print("title: ", restaurant['name'])
+        ### reply
+        reply_token = event.reply_token
+
+        buttons_template_message = TemplateSendMessage(
+            alt_text = restaurant["name"],
+            template = ButtonsTemplate(
+                thumbnail_image_url = thumbnail_image_url,
+                title = restaurant['name'],
+                text= details,
+                actions=[
+                    URITemplateAction(
+                        label='查看地圖',
+                        uri=map_url
+                    ),
+                ]
+            )
+        )
+        line_bot_api.reply_message(reply_token, buttons_template_message)
+        self.go_back()
 ############ on_exit ############
-    def on_exit_state1(self):
-        print("Leaving state1")
+    # def on_exit_state1(self):
+    #     print("Leaving state1")

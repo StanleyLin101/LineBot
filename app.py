@@ -20,7 +20,7 @@ load_dotenv()
 
 
 machine = TocMachine(
-    states=["user", "greeting","showFSM","getLocation","FindRestaurant","FindDrink","state1"],
+    states=["user", "greeting","showFSM","getLocation","FindRestaurant","FindDrink","FindBomb"],
     transitions=[
         {
             "trigger": "advance",
@@ -48,6 +48,12 @@ machine = TocMachine(
         },
         {
             "trigger": "advance",
+            "source": "greeting",
+            "dest": "getLocation",
+            "conditions": "is_going_to_Bomb",
+        },
+        {
+            "trigger": "advance",
             "source": "getLocation",
             "dest": "FindRestaurant",
             "conditions": "is_going_to_FindRestaurant",
@@ -57,6 +63,12 @@ machine = TocMachine(
             "source": "getLocation",
             "dest": "FindDrink",
             "conditions": "is_going_to_FindDrink",
+        },
+        {
+            "trigger": "advance",
+            "source": "getLocation",
+            "dest": "FindBomb",
+            "conditions": "is_going_to_FindBomb",
         },
         {
             "trigger": "advance",
@@ -83,7 +95,7 @@ machine = TocMachine(
             "conditions": "is_going_to_greeting_again",
         },
         {   "trigger": "go_back", 
-            "source": "showFSM",
+            "source": ["showFSM","FindBomb"],
             "dest": "user"
         },
     ],
