@@ -147,7 +147,7 @@ class TocMachine(GraphMachine):
 
     def on_enter_showFSM(self, event):
         reply_token = event.reply_token
-        img_url = "https://i.imgur.com/LyH9mRp.jpg"
+        img_url = "https://i.imgur.com/E8jsNfR.png"
         try:
             message = ImageSendMessage(original_content_url=img_url, preview_image_url=img_url)
             line_bot_api.reply_message(reply_token,message)
