@@ -46,16 +46,35 @@ class TocMachine(GraphMachine):
         self.machine = GraphMachine(model=self, **machine_configs)
         # print("User!")
         self.items=[]
+        self.getnewLocation = False
 
 ############ is_going ############
     def is_going_to_greeting(self, event):
         text = event.message.text
         return text.lower() == "hi"
 
+    def is_going_to_showFSM(self, event):
+        text = event.message.text
+        return text.lower() == "fsm"
+
     def is_going_to_state1(self, event):
         text = event.message.text
         return text.lower() == "go to state1"
     
+    def is_going_to_eat(self, event):
+        text = event.message.text
+        return text.lower() == "吃東西"
+
+    def is_going_to_drink(self, event):
+        text = event.message.text
+        return text.lower() == "喝飲料"
+
+    def is_going_to_FindRestaurant(self, event):
+        return self.ans == "吃東西"
+
+    def is_going_to_FindDrink(self, event):
+        return self.ans == "喝飲料"
+
     def is_going_to_FindnewRestaurant(self, event):
         text = event.message.text
         print("FindnewRestaurant text: ",text)
@@ -63,10 +82,24 @@ class TocMachine(GraphMachine):
             return True
         else:
             return False
+    def is_going_to_FindnewDrink(self, event):
+        text = event.message.text
+        print("FindnewDrink text: ",text)
+        if(text == '換一間啦'):
+            return True
+        else:
+            return False
+    def is_going_to_getLocation_again(self, event):
+        text = event.message.text
+        print("getLocation_again text: ",text)
+        if("地點" or "地方" or "位置" in text):
+            return True
+        else:
+            return False
     def is_going_to_greeting_again(self, event):
         text = event.message.text
-        print("FindnewRestaurant text: ",text)
-        if(text == '換一間啦'):
+        print("text: ",text)
+        if('換一間啦' or "地點" or "地方" or "位置" in text):
             return False
         else:
             return True
@@ -105,13 +138,31 @@ class TocMachine(GraphMachine):
         )
         line_bot_api.reply_message(reply_token, self.message)
         # self.go_back()
-    # def on_exit_greeting(self):
-    #     print("Leaving greeting")
+
+    def on_enter_showFSM(self, event):
+        reply_token = event.reply_token
+        img_url = "https://i.imgur.com/LyH9mRp.jpg"
+        try:
+            message = ImageSendMessage(original_content_url=img_url, preview_image_url=img_url)
+            line_bot_api.reply_message(reply_token,message)
+        except:
+            print("fail to get fsm")
+        self.go_back()
 
     def on_enter_getLocation(self, event):
-        # print("I'm entering eating")
         self.ans = event.message.text
+        if self.ans == "吃東西":
+            self.mode = "eat"
+        elif self.ans == "喝飲料":
+            self.mode = "drink"
         print("ans: ", self.ans)
+        if not first:
+            self.getnewLocation = True
+            if self.mode == "eat":
+                self.ans = "吃東西"
+            elif self.mode == "drink":
+                self.ans = "喝飲料"
+        print("new ans: ", self.ans)
         reply_token = event.reply_token
         send_text_message(reply_token, "請輸入你的位置")
 
@@ -128,6 +179,7 @@ class TocMachine(GraphMachine):
         self.go_back()
 
     def on_enter_FindRestaurant(self, event):
+        self.mode = "eat"
         print("I'm entering FindRestaurant")
         # print("Res ans = ", self.ans)
         text = event.message.text
@@ -135,8 +187,8 @@ class TocMachine(GraphMachine):
         if first:
             self.previous_address = text
             first = False
-        # print(text)
-        # get_location('台南市東區中華東路三段380巷1號1')
+        if self.getnewLocation and "換一間啦" not in text:
+            self.previous_address = text
 
         ### get lat and lng
         address = urllib.request.quote(self.previous_address)
@@ -169,7 +221,7 @@ class TocMachine(GraphMachine):
         bravo = []
         for i in range(res_num):
             try:
-                if top20_restaurants[i]['rating'] > 3.9:
+                if top20_restaurants[i]['rating'] > 3.5:
                     print('rate: ', top20_restaurants[i]['rating'])
                     bravo.append(i)
             except:
@@ -221,6 +273,99 @@ class TocMachine(GraphMachine):
         line_bot_api.reply_message(reply_token, buttons_template_message)
         # self.go_back_greeting()
 
+    def on_enter_FindDrink(self, event):
+        self.mode = "drink"
+        print("I'm entering FindDrink")
+        # print("Res ans = ", self.ans)
+        text = event.message.text
+        global first
+        if first:
+            self.previous_address = text
+            first = False
+        # print(text)
+        # get_location('台南市東區中華東路三段380巷1號1')
+
+        ### get lat and lng
+        address = urllib.request.quote(self.previous_address)
+        url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + address + '&key='+ Google_Map_API_KEY
+
+        while True:
+            res = requests.get(url)
+            js = json.loads(res.text)
+
+            if js['status'] != "OVER_QUERY_LIMIT":
+                time.sleep(1)
+                break
+
+        result = js['results'][0]["geometry"]["location"]
+        lat = result["lat"]
+        lng = result["lng"]
+        print(lat, lng)
+        ###
+        ### nearby restaurants
+        if self.ans == "吃東西":
+            foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&type=restaurant&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        elif self.ans == "喝飲料":
+            foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&keyword=飲料&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        else:
+             foodStoreSearch = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?key={}&location={},{}&rankby=distance&language=zh-TW".format(Google_Map_API_KEY, lat, lng)
+        foodReq = requests.get(foodStoreSearch)
+        nearby_restaurants_dict = foodReq.json()
+        top20_restaurants = nearby_restaurants_dict['results']
+        res_num = len(top20_restaurants)
+        bravo = []
+        for i in range(res_num):
+            try:
+                if top20_restaurants[i]['rating'] > 3.5:
+                    print('rate: ', top20_restaurants[i]['rating'])
+                    bravo.append(i)
+            except:
+                KeyError
+        if len(bravo) < 0:
+            content = "沒東西可以吃"
+            # restaurant = random.choice(top20_restaurants)
+        
+        restaurant = top20_restaurants[random.choice(bravo)]
+
+        if restaurant.get("photos") is None:
+            thumbnail_image_url = None
+        else:
+            photo_reference = restaurant["photos"][0]["photo_reference"]
+            photo_width = restaurant["photos"][0]["width"]
+            thumbnail_image_url = "https://maps.googleapis.com/maps/api/place/photo?key={}&photoreference={}&maxwidth={}".format(Google_Map_API_KEY, photo_reference, photo_width)
+        
+        rating = "無" if restaurant.get("rating") is None else restaurant["rating"]
+        address = "沒有資料" if restaurant.get("vicinity") is None else restaurant["vicinity"]
+        details = "Google Map 評分: {}\n地址:{}".format(rating, address)
+        print(details)
+
+        map_url = "https://www.google.com/maps/search/?api=1&query={lat},{long}&query_place_id={place_id}".format(lat=restaurant["geometry"]["location"]["lat"], long=restaurant["geometry"]["location"]["lng"], place_id= restaurant["place_id"])
+        ###
+        print("Find Restaurant")
+        print("title: ", restaurant['name'])
+        ### reply
+        reply_token = event.reply_token
+
+        buttons_template_message = TemplateSendMessage(
+            alt_text = restaurant["name"],
+            template = ButtonsTemplate(
+                thumbnail_image_url = thumbnail_image_url,
+                title = restaurant['name'],
+                text= details,
+                actions=[
+                    URITemplateAction(
+                        label='查看地圖',
+                        uri=map_url
+                    ),
+                    PostbackTemplateAction(
+                        label='換一間啦',
+                        text='換一間啦',
+                        data='換一間啦'
+                    )
+                ]
+            )
+        )
+        line_bot_api.reply_message(reply_token, buttons_template_message)
 ############ on_exit ############
     def on_exit_state1(self):
         print("Leaving state1")

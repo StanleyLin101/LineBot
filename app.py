@@ -20,7 +20,7 @@ load_dotenv()
 
 
 machine = TocMachine(
-    states=["user", "greeting","getLocation","FindRestaurant","state1"],
+    states=["user", "greeting","showFSM","getLocation","FindRestaurant","FindDrink","state1"],
     transitions=[
         {
             "trigger": "advance",
@@ -30,15 +30,33 @@ machine = TocMachine(
         },
         {
             "trigger": "advance",
+            "source": "user",
+            "dest": "showFSM",
+            "conditions": "is_going_to_showFSM",
+        },
+        {
+            "trigger": "advance",
             "source": "greeting",
             "dest": "getLocation",
-            # "conditions": "is_going_to_eat",
+            "conditions": "is_going_to_eat",
+        },
+        {
+            "trigger": "advance",
+            "source": "greeting",
+            "dest": "getLocation",
+            "conditions": "is_going_to_drink",
         },
         {
             "trigger": "advance",
             "source": "getLocation",
             "dest": "FindRestaurant",
-            # "conditions": "is_going_to_FindRestaurant",
+            "conditions": "is_going_to_FindRestaurant",
+        },
+        {
+            "trigger": "advance",
+            "source": "getLocation",
+            "dest": "FindDrink",
+            "conditions": "is_going_to_FindDrink",
         },
         {
             "trigger": "advance",
@@ -47,13 +65,25 @@ machine = TocMachine(
             "conditions": "is_going_to_FindnewRestaurant",
         },
         {
+            "trigger": "advance",
+            "source": "FindDrink",
+            "dest": "FindDrink",
+            "conditions": "is_going_to_FindnewDrink",
+        },
+        {
             "trigger": "advance", 
-            "source": "FindRestaurant",
+            "source": ["FindRestaurant","FindDrink"],
+            "dest": "getLocation",
+            "conditions": "is_going_to_getLocation_again",
+        },
+        {
+            "trigger": "advance", 
+            "source": ["FindRestaurant","FindDrink"],
             "dest": "greeting",
             "conditions": "is_going_to_greeting_again",
         },
         {   "trigger": "go_back", 
-            "source": ["showMap"], 
+            "source": "showFSM",
             "dest": "user"
         },
     ],
@@ -69,7 +99,6 @@ app = Flask(__name__, static_url_path="")
 channel_secret = os.getenv("LINE_CHANNEL_SECRET", None)
 channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", None)
 Google_Map_API_KEY = os.getenv("GOOGLE_MAP_API_KEY", None)
-
 if channel_secret is None:
     print("Specify LINE_CHANNEL_SECRET as environment variable.")
     sys.exit(1)
@@ -120,7 +149,6 @@ def webhook_handler():
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         abort(400)
-
     # print("***********"+str(events)+"************\n")
 
     # if(events.message.type == "location"):
@@ -162,3 +190,4 @@ def show_fsm():
 if __name__ == "__main__":
     port = os.environ.get("PORT", 8000)
     app.run(host="0.0.0.0", port=port, debug=True)
+    show_fsm()
